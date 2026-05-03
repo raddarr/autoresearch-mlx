@@ -302,6 +302,8 @@ def make_dataloader(tokenizer, batch_size, seq_len, split, buffer_size=1000):
                 best_idx = bisect.bisect_right(doc_buffer, (remaining, float("inf"), None)) - 1
 
                 if best_idx >= 0:
+                    best_len = doc_buffer[best_idx][0]
+                    best_idx = bisect.bisect_left(doc_buffer, (best_len, -1, None))
                     _, _, doc = doc_buffer.pop(best_idx)
                     row.extend(doc)
                     pos += len(doc)

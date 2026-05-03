@@ -33,6 +33,19 @@ Then point Claude Code or another coding agent at `program.md` and let it run th
 
 The loop is the same as upstream: edit `train.py`, run a fixed-budget experiment, read `val_bpb`, keep the change if it wins, revert if it loses, and repeat.
 
+## Development checks
+
+```bash
+# syntax check
+python3 -m py_compile prepare.py train.py tests/test_prepare.py scripts/bench_dataloader.py
+
+# dataloader behavior tests
+uv run python -m unittest discover -s tests
+
+# synthetic dataloader packing benchmark
+uv run python scripts/bench_dataloader.py --steps 50
+```
+
 ## Public baseline results
 
 The public `results.tsv` captures the initial hardware-local walk from the default baseline down to `1.807902`:

@@ -33,6 +33,18 @@ Then point Claude Code or another coding agent at `program.md` and let it run th
 
 The loop is the same as upstream: edit `train.py`, run a fixed-budget experiment, read `val_bpb`, keep the change if it wins, revert if it loses, and repeat.
 
+## Reliability and tooling updates
+
+This branch keeps the research protocol unchanged while tightening the preparation and development workflow:
+
+- Cached parquet shards are validated before reuse. Missing or unreadable shards are redownloaded instead of being treated as ready.
+- Data preparation now fails clearly if any requested shard could not be downloaded after retries.
+- The dataloader packing buffer is length-sorted, preserving the original best-fit behavior while avoiding repeated full-buffer scans.
+- `program.md` now documents both standalone-repo and monorepo-safe git staging commands.
+- Lightweight unittest coverage checks parquet validation, dataloader shape/shift behavior, long-document cropping, and legacy packing equivalence.
+- A synthetic dataloader benchmark compares the optimized packer against the previous linear-scan strategy.
+- GitHub Actions CI runs syntax checks and the unittest suite on pull requests.
+
 ## Development checks
 
 ```bash

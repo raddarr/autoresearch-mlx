@@ -10,6 +10,7 @@ Data and tokenizer are stored in ~/.cache/autoresearch/.
 """
 
 import argparse
+import bisect
 import math
 import os
 import pickle
@@ -109,6 +110,9 @@ def download_data(num_shards, download_workers=8):
 
     ok = sum(1 for result in results if result)
     print(f"Data: {ok}/{len(ids)} shards ready at {DATA_DIR}")
+    if ok != len(ids):
+        failed = len(ids) - ok
+        raise RuntimeError(f"Failed to download {failed} shard(s). Rerun prepare.py to retry.")
 
 
 def list_parquet_files():
@@ -273,13 +277,17 @@ def make_dataloader(tokenizer, batch_size, seq_len, split, buffer_size=1000):
     batches = _document_batches(split)
     bos_token = tokenizer.get_bos_token_id()
     doc_buffer = []
+    next_doc_id = 0
     epoch = 1
 
     def refill_buffer():
-        nonlocal epoch
+        nonlocal epoch, next_doc_id
         doc_batch, epoch = next(batches)
         token_lists = tokenizer.encode(doc_batch, prepend=bos_token)
-        doc_buffer.extend(token_lists)
+        for doc in token_lists:
+            doc_buffer.append((len(doc), next_doc_id, doc))
+            next_doc_id += 1
+        doc_buffer.sort()
 
     while True:
         all_rows = []
@@ -291,21 +299,14 @@ def make_dataloader(tokenizer, batch_size, seq_len, split, buffer_size=1000):
                     refill_buffer()
 
                 remaining = row_capacity - pos
-                best_idx = -1
-                best_len = 0
-                for index, doc in enumerate(doc_buffer):
-                    doc_len = len(doc)
-                    if doc_len <= remaining and doc_len > best_len:
-                        best_idx = index
-                        best_len = doc_len
+                best_idx = bisect.bisect_right(doc_buffer, (remaining, float("inf"), None)) - 1
 
                 if best_idx >= 0:
-                    doc = doc_buffer.pop(best_idx)
+                    _, _, doc = doc_buffer.pop(best_idx)
                     row.extend(doc)
                     pos += len(doc)
                 else:
-                    shortest_idx = min(range(len(doc_buffer)), key=lambda index: len(doc_buffer[index]))
-                    doc = doc_buffer.pop(shortest_idx)
+                    _, _, doc = doc_buffer.pop(0)
                     row.extend(doc[:remaining])
                     pos += remaining
 

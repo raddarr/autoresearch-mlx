@@ -20,6 +20,7 @@ from multiprocessing import Pool
 
 import mlx.core as mx
 import numpy as np
+import pyarrow as pa
 import pyarrow.parquet as pq
 import requests
 import rustbpe
@@ -52,12 +53,28 @@ SPECIAL_TOKENS = [f"<|reserved_{i}|>" for i in range(4)]
 BOS_TOKEN = "<|reserved_0|>"
 
 
+def is_valid_parquet(filepath):
+    """Return True if a cached shard exists and can be opened as parquet."""
+    if not os.path.exists(filepath):
+        return False
+    try:
+        pq.ParquetFile(filepath)
+        return True
+    except (OSError, pa.ArrowException):
+        return False
+
+
 def download_single_shard(index):
     """Download one parquet shard with retries. Returns True on success."""
     filename = f"shard_{index:05d}.parquet"
     filepath = os.path.join(DATA_DIR, filename)
-    if os.path.exists(filepath):
+    if is_valid_parquet(filepath):
         return True
+    if os.path.exists(filepath):
+        try:
+            os.remove(filepath)
+        except OSError:
+            pass
 
     url = f"{BASE_URL}/{filename}"
     max_attempts = 5
@@ -95,7 +112,7 @@ def download_data(num_shards, download_workers=8):
         ids.append(VAL_SHARD)
 
     existing = sum(
-        1 for index in ids if os.path.exists(os.path.join(DATA_DIR, f"shard_{index:05d}.parquet"))
+        1 for index in ids if is_valid_parquet(os.path.join(DATA_DIR, f"shard_{index:05d}.parquet"))
     )
     if existing == len(ids):
         print(f"Data: all {len(ids)} shards already downloaded at {DATA_DIR}")

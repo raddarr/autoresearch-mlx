@@ -1,3 +1,5 @@
+import os
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -75,6 +77,20 @@ def legacy_packed_rows(docs, batch_size, seq_len, buffer_size, rows_needed):
 
 
 class MakeDataloaderTests(unittest.TestCase):
+    def test_is_valid_parquet_rejects_missing_and_invalid_files(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            missing_path = os.path.join(tmpdir, "missing.parquet")
+            invalid_path = os.path.join(tmpdir, "invalid.parquet")
+            valid_path = os.path.join(tmpdir, "valid.parquet")
+
+            with open(invalid_path, "wb") as handle:
+                handle.write(b"not parquet")
+            prepare.pq.write_table(prepare.pa.table({"text": ["hello"]}), valid_path)
+
+            self.assertFalse(prepare.is_valid_parquet(missing_path))
+            self.assertFalse(prepare.is_valid_parquet(invalid_path))
+            self.assertTrue(prepare.is_valid_parquet(valid_path))
+
     def test_sorted_buffer_matches_legacy_best_fit_packing(self):
         docs = [
             [10, 11],
